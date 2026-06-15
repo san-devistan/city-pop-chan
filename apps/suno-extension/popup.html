@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>City Pop Chan Capture</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <div>
+          <p class="eyebrow">City Pop Chan</p>
+          <h1>Studio Capture</h1>
+        </div>
+        <button id="refresh" type="button">Refresh</button>
+      </header>
+
+      <section class="summary" aria-live="polite">
+        <div>
+          <span class="label">Source</span>
+          <strong id="source">Current tab</strong>
+        </div>
+        <div>
+          <span class="label">Items</span>
+          <strong id="count">0</strong>
+        </div>
+      </section>
+
+      <section class="panel" id="suno-view" hidden>
+        <div>
+          <h2>Suno songs</h2>
+          <p id="suno-message">Open the Suno create page.</p>
+        </div>
+        <button id="send-studio" type="button">Save IDs for Studio</button>
+      </section>
+
+      <section class="panel" id="youtube-view" hidden>
+        <img id="youtube-thumbnail" alt="" class="thumbnail" />
+        <div>
+          <h2 id="youtube-title">YouTube video</h2>
+        </div>
+        <div class="button-grid">
+          <button id="save-thumbnail-inspiration" type="button">
+            Save image
+          </button>
+          <button id="save-title-inspiration" type="button">Save title</button>
+          <button id="save-both-inspiration" type="button">Save both</button>
+        </div>
+      </section>
+
+      <section class="panel" id="distrokid-view" hidden>
+        <div>
+          <h2>DistroKid release</h2>
+          <p id="distrokid-message">Open DistroKid from Studio.</p>
+        </div>
+        <dl class="release-meta">
+          <div>
+            <dt>Album</dt>
+            <dd id="distrokid-album">--</dd>
+          </div>
+        </dl>
+        <button id="fill-distrokid" type="button">Fill DistroKid form</button>
+      </section>
+
+      <section class="panel" id="empty-view" hidden>
+        <div>
+          <h2>Nothing to capture</h2>
+          <p>Open Suno, YouTube, Pinterest, or DistroKid from Studio.</p>
+        </div>
+      </section>
+
+      <p class="status" id="status" role="status">Reading current tab...</p>
+    </main>
+
+    <script src="dist/popup.js"></script>
+  </body>
+</html>

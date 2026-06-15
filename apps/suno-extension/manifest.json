@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "City Pop Chan Capture",
+  "description": "Send Suno song IDs, YouTube inspirations, and prepared DistroKid releases to the local Studio.",
+  "version": "0.1.0",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Capture for Studio"
+  },
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": [
+    "https://suno.com/*",
+    "https://distrokid.com/*",
+    "https://*.distrokid.com/*",
+    "https://pinterest.com/*",
+    "https://*.pinterest.com/*",
+    "https://*.pinimg.com/*",
+    "https://www.youtube.com/*",
+    "https://youtu.be/*",
+    "http://127.0.0.1:4177/*"
+  ]
+}

@@ -1,0 +1,24 @@
+# Work with Channel IDs Stay organized with collections Save and categorize content based on your preferences.
+## Page Summary
+- YouTube channels can now be identified solely by their Google+ profile, without a traditional YouTube username.
+- The YouTube Data API v3 exclusively uses channel IDs to identify channels, offering consistency for channels with or without legacy usernames.
+- Developers can use the channels.list method in v3 to retrieve a channel ID based on the authorized user or a legacy username.
+- In v2, it's crucial to recognize that not every YouTube channel has a unique username, but all have a unique channel ID, which is the recommended identifier.
+- The deprecated Data API v2 can use channel IDs in place of usernames in request URLs, and default can be used instead of usernames for authenticated v2 requests.
+Jeff Posnick, YouTube Developer Relations – June 2013
+For more than a year, it’s been possible to link Google+ profiles with YouTube channels, and we’ve blogged about how some of the Data API v2 responses have changed as a result of that profile link. More recently, it has become possible to create new YouTube channels that don’t have a traditional YouTube username associated with them and, instead, are solely identified by their Google+ profile . Much of the information from that blog post still applies, but this extra wrinkle does invalidate some fundamental assumptions about YouTube channels – like that each one will always be associated with a unique YouTube username – and we wanted to follow up with some additional best practices to write code that works with all flavors of channels.
+## Channel IDs in the Data API v3
+All v3 operations that work with channels use channel IDs exclusively as a means of identifying those channels. The ID for a specific YouTube user’s channel is identical in both v2 and v3 of the API, simplifying migrations between versions. This complete reliance on channel IDs might be perplexing for developers who were previously used to passing YouTube usernames to API methods, but v3 was designed to treat channels with and without legacy usernames identically, and that means using channel IDs everywhere.
+If you are using v3 and want to retrieve the channel ID that corresponds to the currently authorized user, you can call the channels.list(part="id", mine=true) method. This is equivalent to asking for the channel profile of the default user in v2.
+If you ever do find yourself with an arbitrary legacy YouTube username that you need to translate into a channel ID using v3 of the API, you can make a channels.list(part="id", forUsername=" username ") call to the API.
+If you only know a display name and are looking to find the corresponding channel, the search.list(part="snippet", type="channel", q=" display name ") method will come in handy. You should be prepared to deal with the possibility of the call returning more than one item in the response, since display names are not unique.
+## Channel IDs in the Data API v2
+Note: The YouTube Data API (v2) has been deprecated since February 26, 2014, and the API has been turned down . Applications still using the v2 API should migrate to the v3 API immediately.
+The biggest takeaway for developers using the older Data API v2 is that you must be aware that not every YouTube channel has a unique username . Fortunately, every YouTube channel is guaranteed to have a unique channel ID associated with it, represented by the value in the <yt:channelId> tag , and that’s the value that we recommend developers use instead of usernames. For instance, if you have a database that maps YouTube usernames to information about that channel, your older entries should continue to work. (Existing channels won’t lose their usernames.) However, as time goes on, it will become more and more likely that you’ll have to work with channels that can’t be uniquely identified by a username.
+A couple of factors simplify the transition from usernames to channel IDs. First, the Data API v2 accepts channel IDs in request URLs wherever it accepts YouTube usernames, meaning that you can seamlessly swap a channel ID into your existing code. For example, since UC_x5XG1OV2P6uZZ5FSM9Ttw is the channel ID for the channel with the legacy username GoogleDevelopers , the following two URLs are equivalent API requests:
+```
+https://gdata.youtube.com/feeds/api/users/GoogleDevelopers?v=2.1
+
+https://gdata.youtube.com/feeds/api/users/UC_x5XG1OV2P6uZZ5FSM9Ttw?v=2.1
+```
+Another thing to keep in mind is that whenever you’re making authenticated v2 requests, you never need to include the authorized channel’s username when constructing request URLs. You can always use the value default in place of a username (or channel ID). So if you want to retrieve the video uploads feed for the currently authorized user, for instance, you can do so at https://gdata.youtube.com/feeds/api/users/default/uploads?v=2.1 .

@@ -1,0 +1,41 @@
+{
+  "name": "City pop chan",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "turbo build",
+    "dev": "pnpm --dir apps/web dev",
+    "dev:all": "turbo dev",
+    "deps:update": "pnpm up -r",
+    "deps:update:latest": "pnpm up -r --latest",
+    "fix": "bash scripts/fix.sh",
+    "youtube:auth": "node packages/workflow/src/youtube-upload-cli.ts auth",
+    "youtube:upload": "node packages/workflow/src/youtube-upload-cli.ts upload",
+    "youtube:video": "node packages/workflow/src/youtube-video-cli.ts",
+    "suno:download": "node packages/workflow/src/suno-download-cli.ts",
+    "suno:extension:build": "pnpm --dir apps/suno-extension build",
+    "suno:studio": "pnpm --dir apps/web dev",
+    "suno:studio:build": "pnpm --dir apps/web build",
+    "sync:convex-url": "node scripts/sync-convex-url.mjs",
+    "sync:mobile-theme": "node scripts/sync-mobile-theme.mjs"
+  },
+  "dependencies": {
+    "@workspace/workflow": "workspace:*"
+  },
+  "devDependencies": {
+    "oxc-minify": "^0.129.0",
+    "oxc-parser": "^0.129.0",
+    "oxc-resolver": "^11.19.1",
+    "oxc-transform": "^0.129.0",
+    "oxfmt": "^0.48.0",
+    "oxlint": "^1.63.0",
+    "oxlint-tsgolint": "^0.22.1",
+    "turbo": "^2.9.12",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=22.13",
+    "pnpm": ">=11.1.2"
+  },
+  "packageManager": "pnpm@11.1.2"
+}
