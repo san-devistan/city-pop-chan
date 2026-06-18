@@ -9,6 +9,7 @@ const fallbackSongwriterRealName = "Leo Combaret"
 const studioOrigin = "http://127.0.0.1:4177"
 
 type SunoClip = {
+  durationSeconds: number | null
   id: string
   title: string
 }
@@ -111,6 +112,7 @@ const elements = {
   distrokidAlbum: requiredElement("distrokid-album", HTMLElement),
   distrokidMessage: requiredElement("distrokid-message", HTMLElement),
   distrokidView: requiredElement("distrokid-view", HTMLElement),
+  duration: requiredElement("duration", HTMLElement),
   emptyView: requiredElement("empty-view", HTMLElement),
   fillDistroKid: requiredElement("fill-distrokid", HTMLButtonElement),
   refresh: requiredElement("refresh", HTMLButtonElement),
@@ -248,27 +250,7 @@ function render() {
   elements.emptyView.hidden = current.mode !== "empty"
 
   if (current.mode === "suno") {
-    const count = current.clips.length
-    const expected = current.expectedCount
-    const isReady = count > 0 && (expected === 0 || count >= expected)
-    const message = isReady
-      ? expected > 0
-        ? `Ready to load ${count}/${expected} in Studio.`
-        : "Ready to load in Studio."
-      : count > 0
-        ? expected > 0
-          ? `Found ${count}/${expected}. Reset Suno filters or refresh if songs are still missing.`
-          : `Found ${count}. Refresh if songs are still missing.`
-        : "No visible Suno song links found."
-
-    elements.count.textContent =
-      expected > 0 ? `${count}/${expected}` : String(count)
-    elements.source.textContent = "Suno"
-    elements.sunoMessage.textContent = message
-    elements.sendStudio.disabled = count === 0
-    setYoutubeButtonsDisabled(true)
-    elements.fillDistroKid.disabled = true
-    setStatus(message, count > 0 ? "ok" : undefined)
+    renderSuno(current)
     return
   }
 
@@ -278,23 +260,93 @@ function render() {
   }
 
   if (current.mode === "distrokid") {
-    const hasAlbum = Boolean(current.albumFolder)
-    const message = hasAlbum
-      ? "Ready to fill DistroKid from the local Studio package."
-      : "Open DistroKid from Studio so the album can be identified."
-
-    elements.count.textContent = hasAlbum ? "1" : "0"
-    elements.source.textContent = "DistroKid"
-    elements.distrokidAlbum.textContent = current.albumFolder || "--"
-    elements.distrokidMessage.textContent = message
-    elements.sendStudio.disabled = true
-    setYoutubeButtonsDisabled(true)
-    elements.fillDistroKid.disabled = !hasAlbum
-    setStatus(message, hasAlbum ? "ok" : "error")
+    renderDistroKid(current)
     return
   }
 
+  renderEmpty()
+}
+
+function renderSuno(current: Extract<PopupState, { mode: "suno" }>) {
+  const count = current.clips.length
+  const expected = current.expectedCount
+  const duration = clipDurationSummary(current.clips)
+  const durationText =
+    duration.knownCount > 0 ? formatDuration(duration.totalSeconds) : "--"
+  const message = `${sunoFoundMessage(count, expected)}${sunoDurationMessage(
+    duration,
+    count,
+    expected,
+    durationText
+  )}`
+
+  elements.count.textContent =
+    expected > 0 ? `${count}/${expected}` : String(count)
+  elements.duration.textContent = durationText
+  elements.source.textContent = "Suno"
+  elements.sunoMessage.textContent = message
+  elements.sendStudio.disabled = count === 0
+  setYoutubeButtonsDisabled(true)
+  elements.fillDistroKid.disabled = true
+  setStatus(message, count > 0 ? "ok" : undefined)
+}
+
+function sunoFoundMessage(count: number, expected: number) {
+  if (count === 0) {
+    return "No visible Suno song links found."
+  }
+
+  if (expected > 0 && count >= expected) {
+    return `Ready to load ${count}/${expected} in Studio.`
+  }
+
+  if (expected === 0) {
+    return "Ready to load in Studio."
+  }
+
+  return `Found ${count}/${expected}. Reset Suno filters or refresh if songs are still missing.`
+}
+
+function sunoDurationMessage(
+  duration: ReturnType<typeof clipDurationSummary>,
+  count: number,
+  expected: number,
+  durationText: string
+) {
+  if (duration.knownCount === 0) {
+    return ""
+  }
+
+  if (duration.knownCount === count) {
+    const label =
+      expected > 0 && count < expected ? "Detected duration" : "Total duration"
+
+    return ` ${label}: ${durationText}.`
+  }
+
+  return ` Known duration: ${durationText} (${duration.knownCount}/${count}).`
+}
+
+function renderDistroKid(current: Extract<PopupState, { mode: "distrokid" }>) {
+  const hasAlbum = Boolean(current.albumFolder)
+  const message = hasAlbum
+    ? "Ready to fill DistroKid from the local Studio package."
+    : "Open DistroKid from Studio so the album can be identified."
+
+  elements.count.textContent = hasAlbum ? "1" : "0"
+  elements.duration.textContent = "--"
+  elements.source.textContent = "DistroKid"
+  elements.distrokidAlbum.textContent = current.albumFolder || "--"
+  elements.distrokidMessage.textContent = message
+  elements.sendStudio.disabled = true
+  setYoutubeButtonsDisabled(true)
+  elements.fillDistroKid.disabled = !hasAlbum
+  setStatus(message, hasAlbum ? "ok" : "error")
+}
+
+function renderEmpty() {
   elements.count.textContent = "0"
+  elements.duration.textContent = "--"
   elements.source.textContent = "Current tab"
   setPrimaryButtonsDisabled(true)
 }
@@ -303,6 +355,7 @@ function renderImageInspiration(
   current: Extract<PopupState, { mode: "pinterest" | "youtube" }>
 ) {
   elements.count.textContent = "1"
+  elements.duration.textContent = "--"
   elements.sendStudio.disabled = true
   elements.fillDistroKid.disabled = true
 
@@ -566,17 +619,72 @@ function setStatus(message: string, tone?: "error" | "ok") {
   }
 }
 
-function normalizeClips(clips: Array<SunoClip>) {
-  const seen = new Set<string>()
+function clipDurationSummary(clips: Array<SunoClip>) {
+  let knownCount = 0
+  let totalSeconds = 0
 
-  return clips.filter((clip) => {
-    if (!clip.id || seen.has(clip.id)) {
-      return false
+  for (const clip of clips) {
+    if (clip.durationSeconds !== null) {
+      knownCount += 1
+      totalSeconds += clip.durationSeconds
+    }
+  }
+
+  return { knownCount, totalSeconds }
+}
+
+function formatDuration(totalSeconds: number) {
+  const roundedSeconds = Math.max(0, Math.round(totalSeconds))
+  const hours = Math.floor(roundedSeconds / 3600)
+  const minutes = Math.floor((roundedSeconds % 3600) / 60)
+  const seconds = roundedSeconds % 60
+  const paddedSeconds = String(seconds).padStart(2, "0")
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${paddedSeconds}`
+  }
+
+  return `${minutes}:${paddedSeconds}`
+}
+
+function normalizeClips(values: Array<unknown>) {
+  const clips: Array<SunoClip> = []
+  const clipsById = new Map<string, SunoClip>()
+
+  for (const value of values) {
+    if (!isRecord(value)) {
+      continue
     }
 
-    seen.add(clip.id)
-    return true
-  })
+    const id = stringValue(value.id).toLowerCase()
+
+    if (!id) {
+      continue
+    }
+
+    const title = stringValue(value.title)
+    const durationSeconds = durationSecondsValue(value.durationSeconds)
+    const existing = clipsById.get(id)
+
+    if (existing) {
+      if (!existing.title && title) {
+        existing.title = title
+      }
+
+      if (existing.durationSeconds === null && durationSeconds !== null) {
+        existing.durationSeconds = durationSeconds
+      }
+
+      continue
+    }
+
+    const clip = { durationSeconds, id, title }
+
+    clips.push(clip)
+    clipsById.set(id, clip)
+  }
+
+  return clips
 }
 
 function normalizeSunoCollection(value: unknown): SunoCollection {
@@ -780,31 +888,70 @@ function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0
 }
 
+function durationSecondsValue(value: unknown) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return null
+  }
+
+  return value
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
 
+/* eslint-disable max-lines-per-function, unicorn/consistent-function-scoping -- Chrome injects this as one standalone function. */
 async function collectSunoLinksFromPage() {
   const uuidPattern =
     "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
   const uuidRe = new RegExp(uuidPattern, "i")
   const workspaceId = new URL(location.href).searchParams.get("wid")
   const clips: Array<SunoClip> = []
-  const seen = new Set<string>()
+  const clipsById = new Map<string, SunoClip>()
   const expectedCount = readExpectedWorkspaceSongCount()
+  const secondsDurationKeys = [
+    "audio_duration",
+    "clip_duration",
+    "duration",
+    "duration_s",
+    "duration_secs",
+    "durationSeconds",
+  ]
+  const millisecondsDurationKeys = ["duration_ms"]
 
-  function pushClip(id: string, title = "") {
+  function pushClip(
+    id: string,
+    title = "",
+    durationSeconds: number | null = null
+  ) {
     const normalizedId = id.toLowerCase()
 
-    if (normalizedId === workspaceId || seen.has(normalizedId)) {
+    if (normalizedId === workspaceId) {
       return
     }
 
-    seen.add(normalizedId)
-    clips.push({
+    const existing = clipsById.get(normalizedId)
+
+    if (existing) {
+      if (!existing.title && title) {
+        existing.title = title
+      }
+
+      if (existing.durationSeconds === null && durationSeconds !== null) {
+        existing.durationSeconds = durationSeconds
+      }
+
+      return
+    }
+
+    const clip = {
+      durationSeconds,
       id: normalizedId,
       title,
-    })
+    }
+
+    clips.push(clip)
+    clipsById.set(normalizedId, clip)
   }
 
   function collectRenderedClips() {
@@ -813,7 +960,11 @@ async function collectSunoLinksFromPage() {
       const match = href.match(uuidRe)
 
       if (match) {
-        pushClip(match[0], link.textContent?.trim() || "")
+        pushClip(
+          match[0],
+          link.textContent?.trim() || "",
+          readRenderedClipDuration(link)
+        )
       }
     }
 
@@ -828,6 +979,139 @@ async function collectSunoLinksFromPage() {
         pushClip(match[1])
       }
     }
+  }
+
+  function readRenderedClipDuration(element: Element) {
+    const row =
+      element.closest('[role="row"], [role="group"], tr') ||
+      element.parentElement
+
+    return parseDurationText(row?.textContent || "")
+  }
+
+  function parseDurationText(text: string) {
+    const match = text
+      .replace(/\s+/g, " ")
+      .match(/(?:^|[^\d:])((?:\d{1,2}:)?\d{1,2}:\d{2})(?![\d:])/)
+
+    if (!match) {
+      return null
+    }
+
+    return secondsFromColonDuration(match[1])
+  }
+
+  function secondsFromColonDuration(value: string) {
+    const parts = value.split(":").map((part) => Number(part))
+
+    if (!isDurationParts(parts)) {
+      return null
+    }
+
+    if (parts.length === 2) {
+      return parts[0] * 60 + parts[1]
+    }
+
+    return parts[0] * 3600 + parts[1] * 60 + parts[2]
+  }
+
+  function isDurationParts(parts: Array<number>) {
+    if (
+      (parts.length !== 2 && parts.length !== 3) ||
+      parts.some((part) => !Number.isInteger(part) || part < 0)
+    ) {
+      return false
+    }
+
+    const seconds = parts[parts.length - 1]
+
+    if (seconds === undefined || seconds > 59) {
+      return false
+    }
+
+    return (
+      parts.some((part) => part > 0) && (parts.length === 2 || parts[1] <= 59)
+    )
+  }
+
+  function readClipDurationSeconds(clip: unknown) {
+    if (!isObject(clip)) {
+      return null
+    }
+
+    const metadata = isObject(clip.metadata) ? clip.metadata : null
+
+    return (
+      readDurationFromFields(clip, secondsDurationKeys, readSecondsDuration) ||
+      (metadata
+        ? readDurationFromFields(
+            metadata,
+            secondsDurationKeys,
+            readSecondsDuration
+          )
+        : null) ||
+      readDurationFromFields(
+        clip,
+        millisecondsDurationKeys,
+        readMillisecondsDuration
+      ) ||
+      (metadata
+        ? readDurationFromFields(
+            metadata,
+            millisecondsDurationKeys,
+            readMillisecondsDuration
+          )
+        : null)
+    )
+  }
+
+  function readDurationFromFields(
+    record: Record<string, unknown>,
+    keys: Array<string>,
+    readDuration: (value: unknown) => number | null
+  ) {
+    for (const key of keys) {
+      const durationSeconds = readDuration(record[key])
+
+      if (durationSeconds !== null) {
+        return durationSeconds
+      }
+    }
+
+    return null
+  }
+
+  function readSecondsDuration(value: unknown) {
+    if (typeof value === "string") {
+      return parseDurationText(value) || normalizeDurationSeconds(Number(value))
+    }
+
+    if (typeof value === "number") {
+      return normalizeDurationSeconds(value)
+    }
+
+    return null
+  }
+
+  function readMillisecondsDuration(value: unknown) {
+    const duration =
+      typeof value === "number"
+        ? value
+        : typeof value === "string"
+          ? Number(value)
+          : 0
+
+    return normalizeDurationSeconds(duration / 1000)
+  }
+
+  function normalizeDurationSeconds(value: number) {
+    return Number.isFinite(value) && value > 0 && value <= 6 * 60 * 60
+      ? value
+      : null
+  }
+
+  function isObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null
   }
 
   function readExpectedWorkspaceSongCount() {
@@ -852,6 +1136,7 @@ async function collectSunoLinksFromPage() {
     return 0
   }
 
+  // eslint-disable-next-line complexity -- Suno feed pagination is cursor-based and sequential.
   async function collectFeedClips() {
     if (!workspaceId || typeof fetch !== "function") {
       return
@@ -869,6 +1154,7 @@ async function collectSunoLinksFromPage() {
         seenCursors.add(cursor)
       }
 
+      // eslint-disable-next-line no-await-in-loop -- Each request needs the previous cursor.
       const response = await fetch("/api/feed/v3", {
         body: JSON.stringify({
           cursor,
@@ -890,12 +1176,17 @@ async function collectSunoLinksFromPage() {
         return
       }
 
+      // eslint-disable-next-line no-await-in-loop -- The next cursor is inside this page payload.
       const data = await response.json()
       const feedClips = Array.isArray(data?.clips) ? data.clips : []
 
       for (const clip of feedClips) {
         if (clip && typeof clip.id === "string") {
-          pushClip(clip.id, typeof clip.title === "string" ? clip.title : "")
+          pushClip(
+            clip.id,
+            typeof clip.title === "string" ? clip.title : "",
+            readClipDurationSeconds(clip)
+          )
         }
       }
 
@@ -927,6 +1218,7 @@ async function collectSunoLinksFromPage() {
       for (const scrollTop of scrollPositions) {
         scroller.scrollTop = scrollTop
         scroller.dispatchEvent(new Event("scroll", { bubbles: true }))
+        // eslint-disable-next-line no-await-in-loop -- Virtualized rows need one render tick per scroll position.
         await animationFrame()
         collectRenderedClips()
       }
@@ -958,6 +1250,7 @@ async function collectSunoLinksFromPage() {
 
   return { clips, expectedCount: Math.max(expectedCount, clips.length) }
 }
+/* eslint-enable max-lines-per-function, unicorn/consistent-function-scoping */
 
 // eslint-disable-next-line complexity -- Chrome injects this as one standalone function.
 function collectYoutubeInspirationFromPage() {

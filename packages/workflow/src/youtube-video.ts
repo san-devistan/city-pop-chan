@@ -797,7 +797,7 @@ function buildTrackTitleCues(tracks, durations, totalDurationSeconds) {
       return {
         end,
         start,
-        title: formatTrackTitle(path.basename(track)),
+        title: formatNumberedTrackTitle(index + 1, path.basename(track)),
       }
     })
     .filter(Boolean)
@@ -943,6 +943,12 @@ function normalizeDescription(value) {
 
 function formatTrackTitle(fileName) {
   return fileName.replace(/\.mp3$/i, "").replaceAll("-", " ")
+}
+
+function formatNumberedTrackTitle(trackNumber, fileName) {
+  const number = String(trackNumber).padStart(2, "0")
+
+  return `${number}. ${formatTrackTitle(fileName)}`
 }
 
 function formatTime(seconds) {
