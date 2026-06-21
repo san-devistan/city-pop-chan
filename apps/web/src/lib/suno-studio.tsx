@@ -809,10 +809,9 @@ export function AlbumDetailPanel({
   function generateCover(selectedInspirations: Array<Inspiration>) {
     const savedCoverPrompt = coverPrompt.trim()
     const savedCoverText = {
-      leftText: coverText.leftText.trim() || inspirationDefaults.coverLeftText,
-      rightText:
-        coverText.rightText.trim() || inspirationDefaults.coverRightText,
-      topText: coverText.topText.trim() || inspirationDefaults.coverTopText,
+      leftText: coverText.leftText.trim(),
+      rightText: coverText.rightText.trim(),
+      topText: coverText.topText.trim(),
     } satisfies CoverOverlayText
     const savedVideoImageText =
       videoImageText.trim() || inspirationDefaults.videoImageText

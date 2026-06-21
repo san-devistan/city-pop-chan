@@ -7,10 +7,11 @@ import {
 } from "./cover-variants.ts"
 import { readWorkflowEnv } from "./env.ts"
 import {
+  requestUsableGeminiCover,
+  type GeminiCoverSettings,
+} from "./gemini-cover-request.ts"
+import {
   extensionForMime,
-  fetchGeminiImage,
-  findGeminiInlineImage,
-  geminiErrorMessage,
   normalizeGeminiApiVersion,
   normalizeGeminiImageSize,
   normalizeGeminiModelName,
@@ -46,14 +47,6 @@ type GenerateAlbumCoverOptions = {
   videoImageText?: string
 }
 
-type GeminiCoverSettings = {
-  apiKey: string
-  apiVersion: string
-  imageSize: GeminiImageSize | null
-  model: string
-  timeoutMs: number
-}
-
 type CoverGenerationText = {
   coverTextOverlays: CoverTextOverlays
   finalPrompt: string
@@ -82,7 +75,8 @@ export async function generateAlbumCover(
     status: "complete",
   })
 
-  const references = await readCoverReferences(options, progress)
+  const inspirationIds = selectedInspirationIds(options)
+  const references = await readCoverReferences(inspirationIds, progress)
 
   await updateAlbumMetadata(folder, {
     coverAspectRatio: COVER_ASPECT_RATIO,
@@ -90,6 +84,7 @@ export async function generateAlbumCover(
     coverPrompt: text.savedCoverPrompt,
     coverRightText: text.coverTextOverlays.rightText,
     coverTopText: text.coverTextOverlays.topText,
+    inspirationIds,
     videoImageText: text.videoImageText,
   })
 
@@ -98,14 +93,19 @@ export async function generateAlbumCover(
     id: "gemini",
     status: "active",
   })
-  const image = await requestGeminiCover({
-    parts: coverRequestParts(text.finalPrompt, references),
+  const { buffer: imageBuffer, image } = await requestUsableGeminiCover({
+    coverAspectRatio: COVER_ASPECT_RATIO,
+    finalPrompt: text.finalPrompt,
+    onBlankRetry: () => {
+      progress({
+        detail: "Gemini returned a nearly blank cover, retrying.",
+        id: "gemini",
+        status: "active",
+      })
+    },
+    references,
     settings,
   })
-
-  if (!image) {
-    throw new Error("Gemini did not return an inline image.")
-  }
   progress({
     detail: "Gemini returned the cover image.",
     id: "gemini",
@@ -113,7 +113,6 @@ export async function generateAlbumCover(
   })
 
   const extension = extensionForMime(image.mimeType)
-  const imageBuffer = Buffer.from(image.data, "base64")
   progress({
     detail: "Creating title and square cover variations.",
     id: "variants",
@@ -195,11 +194,9 @@ function coverGenerationText(
 }
 
 async function readCoverReferences(
-  options: GenerateAlbumCoverOptions,
+  inspirationIds: Array<string>,
   progress: (event: GenerationStepProgress) => void
 ) {
-  const inspirationIds = selectedInspirationIds(options)
-
   progress({
     detail: coverReferencesProgressDetail(inspirationIds.length),
     id: "references",
@@ -230,56 +227,6 @@ function coverReferencesProgressDetail(count: number) {
   }
 
   return `Loading ${count} inspiration reference${count === 1 ? "" : "s"}.`
-}
-
-function coverRequestParts(
-  finalPrompt: string,
-  references: Array<{ bytes: Buffer; contentType: string }>
-) {
-  return [
-    { text: finalPrompt },
-    ...references.map((reference) => ({
-      inlineData: {
-        data: reference.bytes.toString("base64"),
-        mimeType: reference.contentType,
-      },
-    })),
-  ]
-}
-
-async function requestGeminiCover({
-  parts,
-  settings,
-}: {
-  parts: ReturnType<typeof coverRequestParts>
-  settings: GeminiCoverSettings
-}) {
-  const response = await fetchGeminiImage(
-    `https://generativelanguage.googleapis.com/${settings.apiVersion}/models/${settings.model}:generateContent?key=${encodeURIComponent(settings.apiKey)}`,
-    {
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          imageConfig: {
-            aspectRatio: COVER_ASPECT_RATIO,
-            ...(settings.imageSize ? { imageSize: settings.imageSize } : {}),
-          },
-          responseModalities: ["TEXT", "IMAGE"],
-        },
-      }),
-      headers: { "content-type": "application/json" },
-      method: "POST",
-      signal: AbortSignal.timeout(settings.timeoutMs),
-    },
-    settings.timeoutMs
-  )
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(geminiErrorMessage(data))
-  }
-
-  return findGeminiInlineImage(data)
 }
 
 function selectedInspirationIds(options: {
