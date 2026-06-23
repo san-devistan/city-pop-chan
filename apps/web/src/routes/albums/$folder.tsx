@@ -1,5 +1,7 @@
+/* eslint-disable max-lines-per-function -- The album route owns polling, actions, and rendering for one local Studio workflow. */
+
+import { GenerationProgressPanel } from "@/lib/generation-progress"
 import {
-  GenerationProgressPanel,
   applyGenerationEvent,
   createGenerationProgress,
   fetchGenerationJob,
@@ -8,7 +10,7 @@ import {
   streamGenerationAction,
   type GenerationKind,
   type GenerationProgress,
-} from "@/lib/generation-progress"
+} from "@/lib/generation-progress-state"
 import {
   type Album,
   type AlbumAction,
@@ -75,6 +77,11 @@ function AlbumRoute() {
 
     async function syncGenerationJob() {
       try {
+        if (!isCurrent) {
+          return
+        }
+
+        // react-doctor-disable-next-line react-doctor/async-defer-await -- The post-await guard prevents stale polling results from mutating state after cleanup.
         const job = await fetchGenerationJob(folder)
 
         if (!isCurrent) {
@@ -129,83 +136,115 @@ function AlbumRoute() {
     }
   }, [folder])
 
-  async function runAlbumAction(
-    targetFolder: string,
-    action: AlbumAction,
-    message: string,
-    body?: ApiBody
-  ) {
-    setBusyAlbumAction(action)
+  const runAction = useCallback(
+    async (statusMessage: string, action: () => Promise<void>) => {
+      setIsBusy(true)
+      setStatus(statusMessage)
 
-    try {
-      if (isGenerationAction(action)) {
-        await runGenerationAction(targetFolder, action, message, body)
-        return
+      try {
+        await action()
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Action failed."
+
+        setStatus(errorMessage)
+        setGeneration((current) =>
+          current ? failGenerationProgress(current, errorMessage) : current
+        )
+      } finally {
+        setIsBusy(false)
       }
+    },
+    []
+  )
 
+  const runGenerationAction = useCallback(
+    async (
+      targetFolder: string,
+      action: GenerationKind,
+      message: string,
+      body?: ApiBody
+    ) => {
+      const initialProgress = createGenerationProgress(action)
+
+      setGeneration(initialProgress)
       await runAction(message, async () => {
-        const data = await api<{ album: Album; logs?: string }>(
+        setStatus("")
+
+        const data = await streamGenerationAction<{
+          album: Album
+          logs?: string
+        }>(
           `/api/suno/albums/${encodeURIComponent(targetFolder)}/${action}`,
-          body ?? {}
+          body ?? {},
+          (event) => {
+            setGeneration((current) =>
+              applyGenerationEvent(current || initialProgress, event)
+            )
+          }
         )
 
         setAlbum(data.album)
-        setStatus(actionStatus(action, data.album))
       })
-    } finally {
-      setBusyAlbumAction(null)
-    }
-  }
+    },
+    [runAction]
+  )
 
-  async function runGenerationAction(
-    targetFolder: string,
-    action: GenerationKind,
-    message: string,
-    body?: ApiBody
-  ) {
-    const initialProgress = createGenerationProgress(action)
+  const runAlbumAction = useCallback(
+    async (
+      targetFolder: string,
+      action: AlbumAction,
+      message: string,
+      body?: ApiBody
+    ) => {
+      setBusyAlbumAction(action)
 
-    setGeneration(initialProgress)
-    await runAction(message, async () => {
-      setStatus("")
-
-      const data = await streamGenerationAction<{
-        album: Album
-        logs?: string
-      }>(
-        `/api/suno/albums/${encodeURIComponent(targetFolder)}/${action}`,
-        body ?? {},
-        (event) => {
-          setGeneration((current) =>
-            applyGenerationEvent(current || initialProgress, event)
-          )
+      try {
+        if (isGenerationAction(action)) {
+          await runGenerationAction(targetFolder, action, message, body)
+          return
         }
-      )
 
-      setAlbum(data.album)
-    })
-  }
+        await runAction(message, async () => {
+          const data = await api<{ album: Album; logs?: string }>(
+            `/api/suno/albums/${encodeURIComponent(targetFolder)}/${action}`,
+            body ?? {}
+          )
 
-  async function deleteTrack(targetFolder: string, track: AlbumTrack) {
-    await runAction(`Deleting ${track.title}...`, async () => {
-      await api("/api/suno/tracks/delete", {
-        file: track.name,
-        folder: targetFolder,
-      })
-
-      const nextAlbum = await fetchAlbum(targetFolder)
-
-      if (!nextAlbum) {
-        await navigate({ to: "/" })
-        return
+          setAlbum(data.album)
+          setStatus(actionStatus(action, data.album))
+        })
+      } finally {
+        setBusyAlbumAction(null)
       }
+    },
+    [runAction, runGenerationAction]
+  )
 
-      setAlbum(nextAlbum)
-      setStatus(`Deleted ${track.title}.`)
-    })
-  }
+  const deleteTrack = useCallback(
+    async (targetFolder: string, track: AlbumTrack) => {
+      await runAction(`Deleting ${track.title}...`, async () => {
+        await api("/api/suno/tracks/delete", {
+          file: track.name,
+          folder: targetFolder,
+        })
 
-  async function deleteAlbum() {
+        const nextAlbum = await fetchAlbum(targetFolder)
+
+        if (!nextAlbum) {
+          // react-doctor-disable-next-line react-doctor/tanstack-start-no-navigate-in-render -- This navigation runs from an async user action, not render.
+          await navigate({ to: "/" })
+          return
+        }
+
+        setAlbum(nextAlbum)
+        setStatus(`Deleted ${track.title}.`)
+      })
+    },
+    [navigate, runAction]
+  )
+
+  const deleteAlbum = useCallback(async () => {
     const albumTitle = album?.title || folder.replaceAll("-", " ")
 
     if (!window.confirm(`Delete "${albumTitle}" from local files?`)) {
@@ -214,36 +253,20 @@ function AlbumRoute() {
 
     await runAction(`Deleting ${albumTitle}...`, async () => {
       await api(`/api/suno/albums/${encodeURIComponent(folder)}/delete`, {})
+      // react-doctor-disable-next-line react-doctor/tanstack-start-no-navigate-in-render -- This navigation runs from an async user action, not render.
       await navigate({ to: "/" })
     })
-  }
+  }, [album?.title, folder, navigate, runAction])
 
-  const handleRefreshAlbum = () => {
+  const handleRefreshAlbum = useCallback(() => {
     void loadAlbum()
-  }
-  const handleDeleteAlbum = () => {
+  }, [loadAlbum])
+  const handleDeleteAlbum = useCallback(() => {
     void deleteAlbum()
-  }
+  }, [deleteAlbum])
+
   const activeBusyAction = busyAlbumAction ?? reattachedGenerationKind
   const isAlbumBusy = isBusy || activeBusyAction !== null
-
-  async function runAction(message: string, action: () => Promise<void>) {
-    setIsBusy(true)
-    setStatus(message)
-
-    try {
-      await action()
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Action failed."
-
-      setStatus(message)
-      setGeneration((current) =>
-        current ? failGenerationProgress(current, message) : current
-      )
-    } finally {
-      setIsBusy(false)
-    }
-  }
 
   return (
     <main className="min-h-svh bg-background text-foreground">

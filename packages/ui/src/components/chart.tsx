@@ -7,9 +7,24 @@ import { ChartStyle } from "@workspace/ui/components/chart-style"
 import { ChartTooltipContent } from "@workspace/ui/components/chart-tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import * as React from "react"
-import * as RechartsPrimitive from "recharts"
+import type * as RechartsPrimitive from "recharts"
 
 const INITIAL_DIMENSION = { width: 320, height: 200 } as const
+const ResponsiveContainer = React.lazy(async () => {
+  const { ResponsiveContainer: Component } = await import("recharts")
+
+  return { default: Component }
+})
+const ChartTooltip = React.lazy(async () => {
+  const { Tooltip } = await import("recharts")
+
+  return { default: Tooltip }
+})
+const ChartLegend = React.lazy(async () => {
+  const { Legend } = await import("recharts")
+
+  return { default: Legend }
+})
 
 function ChartContainer({
   id,
@@ -44,18 +59,15 @@ function ChartContainer({
         {...props}
       >
         <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer
-          initialDimension={initialDimension}
-        >
-          {children}
-        </RechartsPrimitive.ResponsiveContainer>
+        <React.Suspense fallback={null}>
+          <ResponsiveContainer initialDimension={initialDimension}>
+            {children}
+          </ResponsiveContainer>
+        </React.Suspense>
       </div>
     </ChartContext.Provider>
   )
 }
-
-const ChartTooltip = RechartsPrimitive.Tooltip
-const ChartLegend = RechartsPrimitive.Legend
 
 export {
   type ChartConfig,

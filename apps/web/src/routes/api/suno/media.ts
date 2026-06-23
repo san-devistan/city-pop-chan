@@ -110,18 +110,30 @@ function parseRange(range: string, size: number) {
   }
 
   if (!startValue) {
-    const suffixLength = Number(endValue)
-
-    if (!Number.isInteger(suffixLength) || suffixLength <= 0) {
-      return null
-    }
-
-    return {
-      end: size - 1,
-      start: Math.max(0, size - suffixLength),
-    }
+    return parseSuffixRange(endValue, size)
   }
 
+  return parseStartRange(startValue, endValue, size)
+}
+
+function parseSuffixRange(endValue: string | undefined, size: number) {
+  const suffixLength = Number(endValue)
+
+  if (!Number.isInteger(suffixLength) || suffixLength <= 0) {
+    return null
+  }
+
+  return {
+    end: size - 1,
+    start: Math.max(0, size - suffixLength),
+  }
+}
+
+function parseStartRange(
+  startValue: string,
+  endValue: string | undefined,
+  size: number
+) {
   const start = Number(startValue)
   const requestedEnd = endValue ? Number(endValue) : size - 1
   const end = Math.min(requestedEnd, size - 1)

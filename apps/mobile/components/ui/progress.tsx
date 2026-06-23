@@ -45,6 +45,7 @@ type IndicatorProps = {
 }
 
 function WebIndicator({ value, className }: IndicatorProps) {
+  // react-doctor-disable-next-line react-doctor/react-compiler-no-manual-memoization -- Oxlint does not model React Compiler for stable style props.
   const indicatorStyle = React.useMemo(
     () => ({ transform: `translateX(-${100 - (value ?? 0)}%)` }),
     [value]

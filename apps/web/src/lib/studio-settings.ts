@@ -37,7 +37,7 @@ export async function saveStudioSettings(settings: StudioSettings) {
   return normalizeStudioSettings(data.settings)
 }
 
-export function normalizeStudioSettings(settings: StudioSettingsInput = {}) {
+function normalizeStudioSettings(settings: StudioSettingsInput = {}) {
   return {
     appleMusicUrl: normalizeText(settings.appleMusicUrl),
     artistName: normalizeTitle(settings.artistName),

@@ -59,10 +59,7 @@ type BadgeProps = React.ComponentProps<typeof View> &
 
 function Badge({ className, variant, asChild, ...props }: BadgeProps) {
   const Component = asChild ? Slot : View
-  const textClassName = React.useMemo(
-    () => badgeTextVariants({ variant }),
-    [variant]
-  )
+  const textClassName = badgeTextVariants({ variant })
 
   return (
     <TextClassContext.Provider value={textClassName}>

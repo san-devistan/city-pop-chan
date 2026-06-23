@@ -1,0 +1,83 @@
+{
+  "$schema": "https://react.doctor/schema/config.json",
+  "ignore": {
+    "files": ["**/.output/**"],
+    "overrides": [
+      {
+        "files": [
+          "components/ui/**",
+          "apps/mobile/components/ui/**",
+          "packages/ui/src/components/**"
+        ],
+        "rules": ["deslop/unused-file"]
+      },
+      {
+        "files": [
+          "components/ui/**",
+          "apps/mobile/components/ui/**",
+          "src/components/**",
+          "packages/ui/src/components/**"
+        ],
+        "rules": [
+          "react-doctor/no-multi-comp",
+          "react-doctor/only-export-components"
+        ]
+      },
+      {
+        "files": ["lib/theme.ts", "apps/mobile/lib/theme.ts"],
+        "rules": ["deslop/unused-export"]
+      },
+      {
+        "files": [
+          "src/lib/suno-studio.tsx",
+          "apps/web/src/lib/suno-studio.tsx"
+        ],
+        "rules": [
+          "react-doctor/only-export-components",
+          "react-doctor/prefer-useReducer"
+        ]
+      },
+      {
+        "files": [
+          "src/routes/albums/$folder.tsx",
+          "src/routes/inspirations.tsx",
+          "apps/web/src/routes/albums/$folder.tsx",
+          "apps/web/src/routes/inspirations.tsx"
+        ],
+        "rules": [
+          "react-doctor/no-multi-comp",
+          "react-doctor/prefer-useReducer"
+        ]
+      },
+      {
+        "files": [
+          "src/components/carousel.tsx",
+          "packages/ui/src/components/carousel.tsx"
+        ],
+        "rules": [
+          "react-doctor/no-pass-data-to-parent",
+          "react-doctor/no-prop-callback-in-effect"
+        ]
+      },
+      {
+        "files": [
+          "package.json",
+          "packages/ui/package.json",
+          "packages/workflow/package.json"
+        ],
+        "rules": ["deslop/unused-dependency"]
+      },
+      {
+        "files": ["src/remotion-*.tsx", "packages/workflow/src/remotion-*.tsx"],
+        "rules": ["react-doctor/only-export-components"]
+      },
+      {
+        "files": [
+          "src/youtube-upload.ts",
+          "packages/workflow/src/youtube-upload.ts"
+        ],
+        "rules": ["react-doctor/local-rpc-native-bridge-risk"]
+      }
+    ]
+  }
+}

@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Album filesystem, metadata, and media helpers share generated album invariants. */
+
 import { spawn } from "node:child_process"
 import type { Dirent, Stats } from "node:fs"
 import {

@@ -19,6 +19,7 @@ function ToggleGroup({
   ...props
 }: React.ComponentProps<typeof ToggleGroupPrimitive.Root> &
   VariantProps<typeof toggleVariants>) {
+  // react-doctor-disable-next-line react-doctor/react-compiler-no-manual-memoization -- Oxlint does not model React Compiler for stable context values.
   const contextValue = React.useMemo(() => ({ variant, size }), [size, variant])
 
   return (
@@ -107,15 +108,11 @@ function ToggleGroupItem({
   const context = useToggleGroupContext()
   const { value } = ToggleGroupPrimitive.useRootContext()
   const selected = ToggleGroupPrimitive.utils.getIsSelected(value, props.value)
-  const textClassName = React.useMemo(
-    () =>
-      cn(
-        "text-sm font-medium text-foreground",
-        selected
-          ? "text-accent-foreground"
-          : Platform.select({ web: "group-hover:text-muted-foreground" })
-      ),
-    [selected]
+  const textClassName = cn(
+    "text-sm font-medium text-foreground",
+    selected
+      ? "text-accent-foreground"
+      : Platform.select({ web: "group-hover:text-muted-foreground" })
   )
   const itemClassName = getToggleGroupItemClassName({
     className,

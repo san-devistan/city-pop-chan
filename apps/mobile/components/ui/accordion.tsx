@@ -83,13 +83,9 @@ function AccordionTrigger({
   children?: React.ReactNode
 }) {
   const { isExpanded } = AccordionPrimitive.useItemContext()
-  const textClassName = React.useMemo(
-    () =>
-      cn(
-        "text-left text-sm font-medium",
-        Platform.select({ web: "group-hover:underline" })
-      ),
-    []
+  const textClassName = cn(
+    "text-left text-sm font-medium",
+    Platform.select({ web: "group-hover:underline" })
   )
 
   const progress = useDerivedValue(

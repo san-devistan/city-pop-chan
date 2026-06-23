@@ -59,37 +59,6 @@ export function wantsProgressStream(request: Request) {
     .some((value) => value.trim() === "application/x-ndjson")
 }
 
-export function progressStream(
-  run: (send: (event: ProgressStreamEvent) => void) => Promise<void>
-) {
-  const encoder = new TextEncoder()
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      let isClosed = false
-      const send = (event: ProgressStreamEvent) => {
-        if (isClosed) {
-          return
-        }
-
-        controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`))
-      }
-
-      try {
-        await run(send)
-      } catch (error) {
-        send({ message: errorMessage(error), type: "error" })
-      } finally {
-        isClosed = true
-        controller.close()
-      }
-    },
-  })
-
-  return new Response(stream, {
-    headers: progressStreamHeaders(),
-  })
-}
-
 export function progressStreamHeaders() {
   return {
     "cache-control": "no-cache",
@@ -119,10 +88,15 @@ export function stringListField(body: Record<string, unknown>, key: string) {
   const value = body[key]
 
   if (Array.isArray(value)) {
-    return value
-      .filter((item): item is string => typeof item === "string")
-      .map((item) => item.trim())
-      .filter(Boolean)
+    return value.flatMap((item) => {
+      if (typeof item !== "string") {
+        return []
+      }
+
+      const trimmed = item.trim()
+
+      return trimmed ? [trimmed] : []
+    })
   }
 
   if (typeof value === "string") {

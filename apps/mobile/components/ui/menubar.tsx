@@ -1,5 +1,3 @@
-/* oxlint-disable max-lines -- Menu primitive parts stay colocated to match the copied registry component shape. */
-
 import { Icon } from "@/components/ui/icon"
 import { NativeOnlyAnimatedView } from "@/components/ui/native-only-animated-view"
 import { TextClassContext } from "@/components/ui/text"
@@ -39,6 +37,7 @@ function Menubar({
   const id = React.useId()
   const [value, setValue] = React.useState<string | undefined>(undefined)
 
+  // react-doctor-disable-next-line react-doctor/react-compiler-no-manual-memoization -- Oxlint does not model React Compiler for stable Pressable handlers.
   const closeMenu = React.useCallback(() => {
     if (onValueChangeProp) {
       onValueChangeProp(undefined)
@@ -73,13 +72,9 @@ function MenubarTrigger({
 }: React.ComponentProps<typeof MenubarPrimitive.Trigger>) {
   const { value } = MenubarPrimitive.useRootContext()
   const { value: itemValue } = MenubarPrimitive.useMenuContext()
-  const textClassName = React.useMemo(
-    () =>
-      cn(
-        "select-none text-sm font-medium group-active:text-accent-foreground",
-        value === itemValue && "text-accent-foreground"
-      ),
-    [itemValue, value]
+  const textClassName = cn(
+    "select-none text-sm font-medium group-active:text-accent-foreground",
+    value === itemValue && "text-accent-foreground"
   )
 
   return (
@@ -113,13 +108,9 @@ function MenubarSubTrigger({
   const { open } = MenubarPrimitive.useSubContext()
   const icon =
     Platform.OS === "web" ? ChevronRight : open ? ChevronUp : ChevronDown
-  const textClassName = React.useMemo(
-    () =>
-      cn(
-        "select-none text-sm group-active:text-accent-foreground",
-        open && "text-accent-foreground"
-      ),
-    [open]
+  const textClassName = cn(
+    "select-none text-sm group-active:text-accent-foreground",
+    open && "text-accent-foreground"
   )
 
   return (
@@ -222,14 +213,10 @@ function MenubarItem({
   inset?: boolean
   variant?: "default" | "destructive"
 }) {
-  const textClassName = React.useMemo(
-    () =>
-      cn(
-        "select-none text-sm text-popover-foreground group-active:text-popover-foreground",
-        variant === "destructive" &&
-          "text-destructive group-active:text-destructive"
-      ),
-    [variant]
+  const textClassName = cn(
+    "select-none text-sm text-popover-foreground group-active:text-popover-foreground",
+    variant === "destructive" &&
+      "text-destructive group-active:text-destructive"
   )
 
   return (

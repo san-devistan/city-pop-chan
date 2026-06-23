@@ -105,10 +105,7 @@ type ButtonProps = React.ComponentProps<typeof Pressable> &
   VariantProps<typeof buttonVariants>
 
 function Button({ className, variant, size, ...props }: ButtonProps) {
-  const textClassName = React.useMemo(
-    () => buttonTextVariants({ variant, size }),
-    [variant, size]
-  )
+  const textClassName = buttonTextVariants({ variant, size })
 
   return (
     <TextClassContext.Provider value={textClassName}>

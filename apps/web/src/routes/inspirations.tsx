@@ -1,3 +1,5 @@
+/* eslint-disable max-lines, max-lines-per-function -- The route keeps settings and inspiration list wiring together for this small Studio tool. */
+
 import { InspirationSection } from "@/components/inspiration-section"
 import {
   DEFAULT_INSPIRATION_DEFAULTS,
@@ -442,6 +444,13 @@ function DefaultInputField({
   onChange: DefaultDraftChange
   value: string
 }) {
+  const handleChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      onChange(field, event.currentTarget.value)
+    },
+    [field, onChange]
+  )
+
   return (
     <div className={fieldClassName(className)}>
       <Label htmlFor={id}>{label}</Label>
@@ -451,7 +460,7 @@ function DefaultInputField({
           value={value}
           disabled={disabled}
           onBlur={onBlur}
-          onChange={(event) => onChange(field, event.currentTarget.value)}
+          onChange={handleChange}
         />
       </InputGroup>
     </div>
@@ -479,6 +488,13 @@ function DefaultTextareaField({
   onChange: DefaultDraftChange
   value: string
 }) {
+  const handleChange = useCallback(
+    (event: ChangeEvent<HTMLTextAreaElement>) => {
+      onChange(field, event.currentTarget.value)
+    },
+    [field, onChange]
+  )
+
   return (
     <div className="grid gap-2">
       <Label htmlFor={id}>{label}</Label>
@@ -489,7 +505,7 @@ function DefaultTextareaField({
           disabled={disabled}
           className={inputClassName}
           onBlur={onBlur}
-          onChange={(event) => onChange(field, event.currentTarget.value)}
+          onChange={handleChange}
         />
       </InputGroup>
     </div>

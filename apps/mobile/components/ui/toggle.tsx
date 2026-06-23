@@ -44,16 +44,12 @@ function Toggle({
   ...props
 }: React.ComponentProps<typeof TogglePrimitive.Root> &
   VariantProps<typeof toggleVariants>) {
-  const textClassName = React.useMemo(
-    () =>
-      cn(
-        "text-sm font-medium text-foreground",
-        props.pressed
-          ? "text-accent-foreground"
-          : Platform.select({ web: "group-hover:text-muted-foreground" }),
-        className
-      ),
-    [className, props.pressed]
+  const textClassName = cn(
+    "text-sm font-medium text-foreground",
+    props.pressed
+      ? "text-accent-foreground"
+      : Platform.select({ web: "group-hover:text-muted-foreground" }),
+    className
   )
 
   return (

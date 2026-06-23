@@ -1,3 +1,6 @@
+/* eslint-disable complexity, max-lines, max-lines-per-function -- Suno Studio is one local workflow surface; split by feature module when the surface grows further. */
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop, react/jsx-max-depth -- This local tool favors direct control wiring over wrapper-heavy indirection. */
+
 import {
   DEFAULT_INSPIRATION_DEFAULTS,
   normalizeInspirationDefaults,
@@ -96,6 +99,17 @@ type CoverOverlayText = {
 
 type CoverOverlayTextField = keyof CoverOverlayText
 
+type AlbumDraftSource = {
+  coverLeftText: string
+  coverPrompt: string
+  coverRightText: string
+  coverTopText: string
+  folder: string
+  videoDescription: string
+  videoImageText: string
+  videoTitle: string
+}
+
 export type Inspiration = {
   id: string
   kind: "cover" | "videoTitle"
@@ -167,6 +181,46 @@ function editableVideoImageText(
   return savedText.trim() ? savedText : defaults.videoImageText
 }
 
+function albumDraftSource(
+  album: Pick<
+    Album,
+    | "coverLeftText"
+    | "coverPrompt"
+    | "coverRightText"
+    | "coverTopText"
+    | "folder"
+    | "videoImageText"
+  >,
+  defaults: InspirationDefaults
+): AlbumDraftSource {
+  return {
+    coverLeftText: album.coverLeftText,
+    coverPrompt: album.coverPrompt,
+    coverRightText: album.coverRightText,
+    coverTopText: album.coverTopText,
+    folder: album.folder,
+    videoDescription: defaults.videoDescription,
+    videoImageText: album.videoImageText,
+    videoTitle: defaults.videoTitle,
+  }
+}
+
+function isSameAlbumDraftSource(
+  left: AlbumDraftSource,
+  right: AlbumDraftSource
+) {
+  return (
+    left.coverLeftText === right.coverLeftText &&
+    left.coverPrompt === right.coverPrompt &&
+    left.coverRightText === right.coverRightText &&
+    left.coverTopText === right.coverTopText &&
+    left.folder === right.folder &&
+    left.videoDescription === right.videoDescription &&
+    left.videoImageText === right.videoImageText &&
+    left.videoTitle === right.videoTitle
+  )
+}
+
 export async function api<T>(path: string, body?: ApiBody): Promise<T> {
   const response = await fetchStudio(path, {
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -180,6 +234,7 @@ export async function api<T>(path: string, body?: ApiBody): Promise<T> {
     throw new Error(errorMessageFromResponse(data, response.status))
   }
 
+  // eslint-disable-next-line typescript/no-unsafe-type-assertion -- Local Studio API endpoints define their response shape at each call site.
   return data as T
 }
 
@@ -208,12 +263,15 @@ function errorMessageFromResponse(data: unknown, status: number) {
 
 function isApiError(value: unknown): value is { error: string } {
   return (
-    typeof value === "object" &&
-    value !== null &&
+    isRecord(value) &&
     "error" in value &&
     typeof value.error === "string" &&
     value.error.length > 0
   )
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
 }
 
 export async function fetchAlbums() {
@@ -276,16 +334,34 @@ export async function uploadPhotoInspirations(files: Array<File>) {
     body: formData,
     method: "POST",
   })
-  const data = (await response.json()) as {
-    error?: string
-    inspirations?: Array<Inspiration>
-  }
+  const data = await readApiJson(response)
 
   if (!response.ok) {
-    throw new Error(data.error || "Upload failed.")
+    throw new Error(isApiError(data) ? data.error : "Upload failed.")
   }
 
-  return data.inspirations || []
+  return inspirationsFromUploadResponse(data)
+}
+
+function inspirationsFromUploadResponse(data: unknown) {
+  if (!isRecord(data) || !Array.isArray(data.inspirations)) {
+    return []
+  }
+
+  return data.inspirations.filter(isInspiration)
+}
+
+function isInspiration(value: unknown): value is Inspiration {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    (value.kind === "cover" || value.kind === "videoTitle") &&
+    (value.source === "photo" || value.source === "youtube") &&
+    (typeof value.thumbnail === "string" || value.thumbnail === null) &&
+    typeof value.thumbnailSourceUrl === "string" &&
+    typeof value.title === "string" &&
+    typeof value.url === "string"
+  )
 }
 
 export function InspirationThumbnail({
@@ -370,7 +446,7 @@ export function actionStatus(action: AlbumAction, album?: Album) {
   return "Upload complete."
 }
 
-export function AlbumBadges({
+function AlbumBadges({
   album,
   linkYoutube = true,
 }: {
@@ -547,6 +623,7 @@ function YoutubeUploadedBadge() {
   )
 }
 
+// react-doctor-disable-next-line react-doctor/no-giant-component -- The panel is a local workflow shell with extracted leaf components below.
 export function AlbumDetailPanel({
   album,
   busyAction,
@@ -606,20 +683,21 @@ export function AlbumDetailPanel({
     editableVideoDescription(DEFAULT_INSPIRATION_DEFAULTS)
   )
   const trackDurations = useTrackDurations(album.tracks)
+  const draftSourceRef = useRef<AlbumDraftSource | null>(null)
+  const draftSource =
+    draftSourceRef.current ??
+    albumDraftSource(album, DEFAULT_INSPIRATION_DEFAULTS)
 
-  useEffect(
-    () => () => {
-      audioRef.current?.pause()
-    },
-    []
-  )
+  if (draftSourceRef.current === null) {
+    draftSourceRef.current = draftSource
+  }
 
-  useEffect(() => {
+  const nextDraftSource = albumDraftSource(album, inspirationDefaults)
+
+  if (!isSameAlbumDraftSource(draftSource, nextDraftSource)) {
+    draftSourceRef.current = nextDraftSource
     setCoverPrompt(editableCoverPrompt(album.coverPrompt, inspirationDefaults))
     setCoverPreviewIndex(0)
-  }, [album.coverPrompt, album.folder, inspirationDefaults])
-
-  useEffect(() => {
     setCoverText(
       editableCoverOverlayText(
         {
@@ -630,33 +708,30 @@ export function AlbumDetailPanel({
         inspirationDefaults
       )
     )
-  }, [
-    album.coverLeftText,
-    album.coverRightText,
-    album.coverTopText,
-    album.folder,
-    inspirationDefaults,
-  ])
-
-  useEffect(() => {
     setVideoTitle(editableVideoTitle(inspirationDefaults))
-  }, [album.folder, inspirationDefaults])
-
-  useEffect(() => {
     setVideoImageText(
       editableVideoImageText(album.videoImageText, inspirationDefaults)
     )
-  }, [album.folder, album.videoImageText, inspirationDefaults])
-
-  useEffect(() => {
     setVideoDescription(editableVideoDescription(inspirationDefaults))
-  }, [album.folder, inspirationDefaults])
+  }
+
+  useEffect(
+    () => () => {
+      audioRef.current?.pause()
+    },
+    []
+  )
 
   useEffect(() => {
     let isCurrent = true
 
     async function loadDefaults() {
       try {
+        if (!isCurrent) {
+          return
+        }
+
+        // react-doctor-disable-next-line react-doctor/async-defer-await -- The post-await guard prevents stale defaults from mutating state after cleanup.
         const defaults = await fetchInspirationDefaults()
 
         if (!isCurrent) {
@@ -678,7 +753,7 @@ export function AlbumDetailPanel({
 
   useEffect(() => {
     if (!isCoverPreviewOpen) {
-      return
+      return undefined
     }
 
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -1085,9 +1160,9 @@ export function AlbumDetailPanel({
           ))}
         </ol>
         {playerError ? (
-          <p className="mt-3 text-sm text-destructive" role="status">
+          <output className="mt-3 block text-sm text-destructive">
             {playerError}
-          </p>
+          </output>
         ) : null}
         {isCoverPreviewOpen && coverVariants.length > 0 ? (
           <CoverPreviewDialog
@@ -1329,11 +1404,11 @@ function CoverInspirationDialog({
   )
 
   return (
-    <div
+    <dialog
+      open
       aria-label={`Choose cover inspiration for ${album.title}`}
       aria-modal="true"
-      className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4"
-      role="dialog"
+      className="fixed inset-0 z-50 m-0 grid h-auto max-h-none w-auto max-w-none place-items-center border-0 bg-black/75 p-4 text-inherit"
     >
       <button
         type="button"
@@ -1496,7 +1571,7 @@ function CoverInspirationDialog({
           </Button>
         </div>
       </div>
-    </div>
+    </dialog>
   )
 }
 
@@ -1601,11 +1676,11 @@ function VideoNameDialog({
   value: string
 }) {
   return (
-    <div
+    <dialog
+      open
       aria-label={`Set video details for ${album.title}`}
       aria-modal="true"
-      className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4"
-      role="dialog"
+      className="fixed inset-0 z-50 m-0 grid h-auto max-h-none w-auto max-w-none place-items-center border-0 bg-black/75 p-4 text-inherit"
     >
       <button
         type="button"
@@ -1690,7 +1765,7 @@ function VideoNameDialog({
           </Button>
         </div>
       </div>
-    </div>
+    </dialog>
   )
 }
 
@@ -1924,7 +1999,7 @@ function totalTrackDuration(
   return totalDuration
 }
 
-export function formatTime(seconds: number) {
+function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds <= 0) {
     return "0:00"
   }

@@ -20,8 +20,13 @@ async function readEnvFiles(files: Array<string>) {
   const entries = await Promise.all(
     files.map((file) => readOptionalEnvFile(path.join(ROOT, file)))
   )
+  const env: Record<string, string> = {}
 
-  return Object.assign({}, ...entries) as Record<string, string>
+  for (const entry of entries) {
+    Object.assign(env, entry)
+  }
+
+  return env
 }
 
 async function readOptionalEnvFile(file: string) {

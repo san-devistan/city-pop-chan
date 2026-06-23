@@ -1,4 +1,4 @@
-import type { GenerationKind } from "@/lib/generation-progress"
+import type { GenerationKind } from "@/lib/generation-progress-state"
 import {
   errorMessage,
   type ProgressStreamEvent,

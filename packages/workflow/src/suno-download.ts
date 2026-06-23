@@ -129,7 +129,7 @@ export async function main(argv = process.argv.slice(2)) {
 
   const config = normalizeOptions(options)
   const input = await collectInput(positionals, config.fromFile)
-  const result = await downloadSunoBatch(input, {
+  await downloadSunoBatch(input, {
     codexCommand: config.codexCommand,
     codexModel: config.codexModel,
     dryRun: config.dryRun,
@@ -139,10 +139,6 @@ export async function main(argv = process.argv.slice(2)) {
     pollSeconds: config.pollSeconds,
     onLog: console.log,
   })
-
-  if (!result.dryRun) {
-    return result
-  }
 }
 
 export async function downloadSunoBatch(input, options = {}) {
