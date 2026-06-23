@@ -335,6 +335,7 @@ function openUrl(url) {
         ? "cmd"
         : "xdg-open"
   const args = process.platform === "win32" ? ["/c", "start", "", url] : [url]
+  // react-doctor-disable-next-line react-doctor/local-rpc-native-bridge-risk -- This only opens the OAuth URL; the callback server binds to 127.0.0.1, accepts one path, and validates OAuth state.
   const child = spawn(command, args, {
     detached: true,
     stdio: "ignore",
